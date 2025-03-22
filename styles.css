@@ -1,0 +1,196 @@
+body {
+    margin: 0;
+    font-family: 'Montserrat', sans-serif;
+    color: #fff;
+}
+
+.hero {
+    position: relative; /* Establishes stacking context */
+    height: 100vh; /* Full viewport height */
+    display: flex;
+    align-items: center; /* Vertically centers content */
+    justify-content: center; /* Horizontally centers content */
+    text-align: center;
+    overflow: hidden; /* Prevents video from spilling out */
+}
+
+.hero-video {
+    position: absolute; /* Takes video out of normal flow */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Fills container without distortion */
+    z-index: -1; /* Places video behind everything */
+}
+
+.hero-content {
+    position: relative; /* Keeps content in normal flow, above video */
+    z-index: 1; /* Ensures content is above video */
+}
+
+.hero-content h1 {
+    font-size: 4rem;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Improves readability */
+}
+
+.hero-content p {
+    font-size: 1.5rem;
+    margin: 10px 0;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Optional overlay for contrast */
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4); /* Darkens video slightly */
+    z-index: 0; /* Between video and content */
+}
+
+h1 {
+    font-size: 4rem;
+    margin: 0;
+}
+
+.cta-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #1A3C34;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+    background: #1A3C34;
+    padding: 20px 0;
+}
+
+.stat-item span {
+    font-size: 2rem;
+    color: #FF0000;
+}
+
+.about {
+    text-align: center;
+    padding: 40px;
+    background: #fff;
+    color: #000;
+}
+
+.about-img {
+    width: 300px;
+    height: auto;
+    margin-right: 20px;
+}
+
+.academics {
+    text-align: center;
+    padding: 40px;
+    background: #f5f5f5;
+    color: #000;
+}
+
+.academics-img {
+    width: 300px;
+    height: auto;
+    margin-right: 20px;
+}
+
+.extracurriculars {
+    text-align: center;
+    padding: 40px;
+    background: #fff;
+    color: #000;
+}
+
+.extracurriculars-img {
+    width: 100px;
+    height: auto;
+    margin-right: 20px;
+}
+
+.highlights {
+    padding: 40px;
+    text-align: center;
+    background: #f5f5f5;
+    color:#000;
+}
+
+iframe {
+    width: 80%;
+    height: 450px;
+}
+
+.footer {
+    background: #1a1a1a; /* Dark background */
+    color: #fff;
+    padding: 20px 0;
+    text-align: center;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.footer-content p {
+    margin: 10px 0;
+    font-size: 1rem;
+}
+
+/* General link styles for email and created-by */
+.footer-content a {
+    color: #fff; /* Matches your CTA yellow */
+    text-decoration: none; /* Removes underline */
+    font-weight: 600; /* Slightly bold for emphasis */
+    transition: color 0.3s ease, transform 0.2s ease; /* Smooth hover effects */
+}
+
+.footer-content a:hover {
+    color: #fff; /* Darker yellow on hover */
+    transform: scale(1.05); /* Subtle zoom effect */
+}
+
+/* Social link styles */
+.social-links {
+    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+    gap: 25px; /* Space between icons */
+}
+
+.social-links a {
+    color: #fff; /* White icons by default */
+    font-size: 1.8rem; /* Slightly larger icons */
+    transition: color 0.3s ease, transform 0.2s ease; /* Smooth hover */
+}
+
+.social-links a:hover {
+    color: #fff; /* Yellow on hover */
+    transform: scale(1.1); /* Slight zoom on hover */
+}
+
+/* Created-by specific styles */
+.created-by {
+    font-size: 0.9rem;
+    color: #ccc; /* Lighter gray text */
+}
+
+.created-by a {
+    color: #fff; /* Matches other links */
+}
+
+.created-by a:hover {
+    color: #fff;
+}
