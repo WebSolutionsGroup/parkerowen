@@ -124,8 +124,10 @@
         document.addEventListener('DOMContentLoaded', function() {
           const urlParams = new URLSearchParams(window.location.search);
           const referrer = urlParams.get('ref') || 'direct';
+          const step = urlParams.get('step') || 'direct';
           gtag('event', 'page_view', {
             'referrer_id': referrer,
+            'step_id': step,
             'page_location': window.location.href
           });
         });
