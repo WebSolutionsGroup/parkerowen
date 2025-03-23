@@ -95,17 +95,11 @@
             <p class="created-by">Created by <a href="https://websolutionsgroup.com" target="_blank" rel="noopener noreferrer">Web Solutions Group, LLC</a></p>
         </div>
     </footer>
-
-    <script src="script.js"></script>
     <script type="module">
-        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-analytics.js";
-        // TODO: Add SDKs for Firebase products that you want to use
-        // https://firebase.google.com/docs/web/setup#available-libraries
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-analytics.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
       
-        // Your web app's Firebase configuration
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
           apiKey: "AIzaSyA23poM6Vx5Aegbrs8Rclm64aPQmhGT7ic",
           authDomain: "parkerowen-5190a.firebaseapp.com",
@@ -116,19 +110,108 @@
           measurementId: "G-FT6LLWLZ43"
         };
       
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
-      </script>
-      <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        const db = getFirestore(app);
+      
+        document.addEventListener('DOMContentLoaded', async () => {
           const urlParams = new URLSearchParams(window.location.search);
           const referrer = urlParams.get('ref') || 'direct';
           const step = urlParams.get('step') || 'direct';
-          gtag('event', 'page_view', {
-            'referrer_id': referrer,
-            'step_id': step,
-            'page_location': window.location.href
+          const pageLocation = window.location.href;
+          const startTime = new Date();
+      
+          // Default location values in case geolocation fails or is denied
+          let location = { latitude: 'N/A', longitude: 'N/A', locationDenied: false };
+      
+          // Function to get user location with fallback
+          const getUserLocation = () => {
+            return new Promise((resolve) => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    locationDenied: false
+                  }),
+                  (error) => {
+                    console.warn('Geolocation failed:', error.message);
+                    resolve({
+                      latitude: 'N/A',
+                      longitude: 'N/A',
+                      locationDenied: true // Flag to indicate denial or error
+                    });
+                  },
+                  { timeout: 5000 } // Timeout after 5 seconds to avoid hanging
+                );
+              } else {
+                console.warn('Geolocation not supported by browser');
+                resolve({
+                  latitude: 'N/A',
+                  longitude: 'N/A',
+                  locationDenied: true
+                });
+              }
+            });
+          };
+      
+          // Attempt to get location, but don’t block logging if it fails
+          try {
+            location = await getUserLocation();
+          } catch (error) {
+            console.error('Error fetching location:', error);
+            location = { latitude: 'N/A', longitude: 'N/A', locationDenied: true };
+          }
+      
+          // Log initial page visit to Analytics (always, even without location)
+          logEvent(analytics, 'page_visit', {
+            referrer_id: referrer,
+            step_id: step,
+            page_location: pageLocation,
+            latitude: String(location.latitude),
+            longitude: String(location.longitude),
+            location_denied: location.locationDenied,
+            timestamp: startTime.toISOString()
+          });
+      
+          // Log to Firestore on page unload (resilient to errors)
+          window.addEventListener('beforeunload', async () => {
+            const endTime = new Date();
+            const timeSpent = Math.round((endTime - startTime) / 1000); // Seconds
+      
+            // Core data to log, even if other parts fail
+            const visitData = {
+              referrer,
+              step,
+              pageLocation,
+              startTime: startTime.toISOString(),
+              endTime: endTime.toISOString(),
+              timeSpent,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              locationDenied: location.locationDenied,
+              userAgent: navigator.userAgent
+            };
+      
+            try {
+              await addDoc(collection(db, 'visits'), visitData);
+            } catch (error) {
+              console.error('Error logging to Firestore:', error);
+              // Optionally log a minimal version to Analytics as a fallback
+              logEvent(analytics, 'visit_log_failure', {
+                referrer_id: referrer,
+                page_location: pageLocation,
+                error_message: error.message
+              });
+            }
+      
+            // Log session end to Analytics (always, even if Firestore fails)
+            logEvent(analytics, 'session_end', {
+              referrer_id: referrer,
+              time_spent: timeSpent,
+              page_location: pageLocation,
+              location_denied: location.locationDenied
+            });
           });
         });
       </script>
