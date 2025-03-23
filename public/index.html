@@ -120,9 +120,7 @@
           const step = urlParams.get('step') || 'direct';
           const pageLocation = window.location.href;
           const startTime = new Date();
-      
-          // Default location values in case geolocation fails or is denied
-          let location = { latitude: 'N/A', longitude: 'N/A', locationDenied: false };
+          const visitId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; // Unique ID per visit
       
           // Function to get user location with fallback
           const getUserLocation = () => {
@@ -134,18 +132,14 @@
                     longitude: position.coords.longitude,
                     locationDenied: false
                   }),
-                  (error) => {
-                    console.warn('Geolocation failed:', error.message);
-                    resolve({
-                      latitude: 'N/A',
-                      longitude: 'N/A',
-                      locationDenied: true // Flag to indicate denial or error
-                    });
-                  },
-                  { timeout: 5000 } // Timeout after 5 seconds to avoid hanging
+                  (error) => resolve({
+                    latitude: 'N/A',
+                    longitude: 'N/A',
+                    locationDenied: true
+                  }),
+                  { timeout: 5000 }
                 );
               } else {
-                console.warn('Geolocation not supported by browser');
                 resolve({
                   latitude: 'N/A',
                   longitude: 'N/A',
@@ -155,15 +149,16 @@
             });
           };
       
-          // Attempt to get location, but don’t block logging if it fails
+          // Get location (won’t block logging)
+          let location;
           try {
             location = await getUserLocation();
           } catch (error) {
-            console.error('Error fetching location:', error);
+            console.error('Location fetch failed:', error);
             location = { latitude: 'N/A', longitude: 'N/A', locationDenied: true };
           }
       
-          // Log initial page visit to Analytics (always, even without location)
+          // Log to Analytics immediately
           logEvent(analytics, 'page_visit', {
             referrer_id: referrer,
             step_id: step,
@@ -171,46 +166,56 @@
             latitude: String(location.latitude),
             longitude: String(location.longitude),
             location_denied: location.locationDenied,
+            visit_id: visitId,
             timestamp: startTime.toISOString()
           });
       
-          // Log to Firestore on page unload (resilient to errors)
-          window.addEventListener('beforeunload', async () => {
-            const endTime = new Date();
-            const timeSpent = Math.round((endTime - startTime) / 1000); // Seconds
-      
-            // Core data to log, even if other parts fail
-            const visitData = {
+          // Log initial visit to Firestore immediately
+          try {
+            await addDoc(collection(db, 'visits'), {
               referrer,
               step,
               pageLocation,
               startTime: startTime.toISOString(),
-              endTime: endTime.toISOString(),
-              timeSpent,
               latitude: location.latitude,
               longitude: location.longitude,
               locationDenied: location.locationDenied,
-              userAgent: navigator.userAgent
-            };
+              userAgent: navigator.userAgent,
+              visitId,
+              timeSpent: 0 // Initial value, updated later
+            });
+          } catch (error) {
+            console.error('Error logging initial visit to Firestore:', error);
+            logEvent(analytics, 'visit_log_failure', { error_message: error.message });
+          }
       
+          // Update timeSpent periodically and on unload
+          let timeSpent = 0;
+          const updateTimeSpent = async () => {
+            timeSpent = Math.round((new Date() - startTime) / 1000);
             try {
-              await addDoc(collection(db, 'visits'), visitData);
-            } catch (error) {
-              console.error('Error logging to Firestore:', error);
-              // Optionally log a minimal version to Analytics as a fallback
-              logEvent(analytics, 'visit_log_failure', {
-                referrer_id: referrer,
-                page_location: pageLocation,
-                error_message: error.message
+              await addDoc(collection(db, 'visit_updates'), {
+                visitId,
+                timeSpent,
+                endTime: new Date().toISOString()
               });
+            } catch (error) {
+              console.error('Error updating timeSpent:', error);
             }
+          };
       
-            // Log session end to Analytics (always, even if Firestore fails)
+          // Update every 10 seconds while on page
+          const intervalId = setInterval(updateTimeSpent, 10000);
+      
+          // Final update on unload
+          window.addEventListener('beforeunload', () => {
+            clearInterval(intervalId);
+            updateTimeSpent();
             logEvent(analytics, 'session_end', {
               referrer_id: referrer,
               time_spent: timeSpent,
               page_location: pageLocation,
-              location_denied: location.locationDenied
+              visit_id: visitId
             });
           });
         });
