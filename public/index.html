@@ -99,10 +99,9 @@
         </div>
     </footer>
     <script type="module">
-      
       import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
       import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-analytics.js";
-      import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+      import { getFirestore, collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
       import { getInstallations } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-installations.js";
     
       const firebaseConfig = {
@@ -143,7 +142,7 @@
               };
             } catch (error) {
               console.error('IP geolocation failed:', error);
-              return { latitude: 'N/A', longitude: 'N/A', locationDenied: true };
+              return { latitude: 'N/A', longitude: 'N/A', locationDenied: true, method: 'unknown' };
             }
           };
     
@@ -196,8 +195,10 @@
             timestamp: startTime.toISOString()
           });
     
+          // Create the initial visit document and store its ID
+          let visitDocRef;
           try {
-            const docRef = await addDoc(collection(db, 'visits'), {
+            visitDocRef = await addDoc(collection(db, 'visits'), {
               referrer,
               step,
               pageLocation,
@@ -208,34 +209,60 @@
               method: location.method || 'unknown',
               userAgent: navigator.userAgent,
               visitId,
-              timeSpent: 0
+              timeSpent: 0,
+              endTime: null
             });
-            console.log('Visit logged to Firestore with ID:', docRef.id);
+            console.log('Visit logged to Firestore with ID:', visitDocRef.id);
           } catch (error) {
             console.error('Error logging initial visit to Firestore:', error);
           }
     
-          let timeSpent = 0;
-          const updateTimeSpent = async () => {
-            timeSpent = Math.round((new Date() - startTime) / 1000);
+          // Function to update the visit document with time and location
+          const updateVisitData = async () => {
+            const timeSpent = Math.round((new Date() - startTime) / 1000);
+            let updatedLocation = location; // Use the initial location by default
+    
+            // Attempt to get a fresh location
             try {
-              await addDoc(collection(db, 'visit_updates'), {
-                visitId,
-                timeSpent,
-                endTime: new Date().toISOString()
-              });
+              const newLocation = await getUserLocation();
+              // Only update if the new location is valid and different from the current one
+              if (
+                newLocation.latitude !== 'N/A' &&
+                newLocation.longitude !== 'N/A' &&
+                (newLocation.latitude !== location.latitude || newLocation.longitude !== location.longitude)
+              ) {
+                updatedLocation = newLocation;
+              }
             } catch (error) {
-              console.error('Error updating timeSpent:', error);
+              console.warn('Failed to update location:', error);
+            }
+    
+            try {
+              await updateDoc(doc(db, 'visits', visitDocRef.id), {
+                timeSpent,
+                endTime: new Date().toISOString(),
+                latitude: updatedLocation.latitude,
+                longitude: updatedLocation.longitude,
+                locationDenied: updatedLocation.locationDenied,
+                method: updatedLocation.method || 'unknown'
+              });
+              console.log('Visit updated - timeSpent:', timeSpent, 'location:', updatedLocation);
+              location = updatedLocation; // Update the local location variable
+            } catch (error) {
+              console.error('Error updating visit:', error);
             }
           };
     
-          const intervalId = setInterval(updateTimeSpent, 10000);
+          // Update every 10 seconds
+          const intervalId = setInterval(updateVisitData, 10000);
+    
+          // Final update on page unload
           window.addEventListener('beforeunload', () => {
             clearInterval(intervalId);
-            updateTimeSpent();
+            updateVisitData(); // Final update
             logEvent(analytics, 'session_end', {
               referrer_id: referrer,
-              time_spent: timeSpent,
+              time_spent: Math.round((new Date() - startTime) / 1000),
               page_location: pageLocation,
               visit_id: visitId
             });
