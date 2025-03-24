@@ -96,135 +96,150 @@
         </div>
     </footer>
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
-      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-analytics.js";
-      import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-firestore.js";
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+      import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
+      import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+      import { getInstallations } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-installations.js";
     
-      const firebaseConfig = { /* Your config */ };
-      const app = initializeApp(firebaseConfig);
-      const analytics = getAnalytics(app);
-      const db = getFirestore(app);
+      const firebaseConfig = {
+        apiKey: "AIzaSyA23poM6Vx5Aegbrs8Rclm64aPQmhGT7ic",
+        authDomain: "parkerowen-5190a.firebaseapp.com",
+        projectId: "parkerowen-5190a",
+        storageBucket: "parkerowen-5190a.firebasestorage.app",
+        messagingSenderId: "150594269406",
+        appId: "1:150594269406:web:97c280ad904574937b524f",
+        measurementId: "G-FT6LLWLZ43"
+      };
     
-      document.addEventListener('DOMContentLoaded', async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const referrer = urlParams.get('ref') || 'direct';
-        const step = urlParams.get('step') || 'direct';
-        const pageLocation = window.location.href;
-        const startTime = new Date();
-        const visitId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      try {
+        const app = initializeApp(firebaseConfig);
+        console.log('Firebase initialized:', app);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+        const installations = getInstallations(app);
+        console.log('Services initialized:', { analytics, db, installations });
     
-        const getFallbackLocation = async () => {
-          try {
-            const response = await fetch('https://ipapi.co/json/');
-            const data = await response.json();
-            console.log('IP-based location:', data);
-            return {
-              latitude: data.latitude || 'N/A',
-              longitude: data.longitude || 'N/A',
-              locationDenied: false,
-              method: 'IP-based'
-            };
-          } catch (error) {
-            console.error('IP geolocation failed:', error);
-            return { latitude: 'N/A', longitude: 'N/A', locationDenied: true };
-          }
-        };
+        document.addEventListener('DOMContentLoaded', async () => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const referrer = urlParams.get('ref') || 'direct';
+          const step = urlParams.get('step') || 'direct';
+          const pageLocation = window.location.href;
+          const startTime = new Date();
+          const visitId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-        const getUserLocation = () => {
-          return new Promise((resolve) => {
-            if (navigator.geolocation) {
-              console.log('Requesting geolocation...');
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  console.log('Geolocation success:', position.coords);
-                  resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    locationDenied: false,
-                    method: 'navigator'
-                  });
-                },
-                async (error) => {
-                  console.warn('Geolocation error:', error.message);
-                  const fallback = await getFallbackLocation();
-                  resolve(fallback);
-                },
-                { timeout: 5000, maximumAge: 60000, enableHighAccuracy: true }
-              );
-            } else {
-              console.warn('Geolocation not supported, using fallback');
-              resolve(getFallbackLocation());
+          const getFallbackLocation = async () => {
+            try {
+              const response = await fetch('https://ipapi.co/json/');
+              const data = await response.json();
+              return {
+                latitude: data.latitude || 'N/A',
+                longitude: data.longitude || 'N/A',
+                locationDenied: false,
+                method: 'IP-based'
+              };
+            } catch (error) {
+              console.error('IP geolocation failed:', error);
+              return { latitude: 'N/A', longitude: 'N/A', locationDenied: true };
             }
-          });
-        };
+          };
     
-        const notice = document.getElementById('location-notice');
-        notice.style.display = 'block';
-        let location;
-        try {
-          location = await getUserLocation();
-        } catch (error) {
-          console.error('Location fetch failed:', error);
-          location = { latitude: 'N/A', longitude: 'N/A', locationDenied: true, method: 'unknown' };
-        }
-        notice.style.display = 'none';
-    
-        logEvent(analytics, 'page_visit', {
-          referrer_id: referrer,
-          step_id: step,
-          page_location: pageLocation,
-          latitude: String(location.latitude),
-          longitude: String(location.longitude),
-          location_denied: location.locationDenied,
-          visit_id: visitId,
-          timestamp: startTime.toISOString()
-        });
-    
-        try {
-          const docRef = await addDoc(collection(db, 'visits'), {
-            referrer,
-            step,
-            pageLocation,
-            startTime: startTime.toISOString(),
-            latitude: location.latitude,
-            longitude: location.longitude,
-            locationDenied: location.locationDenied,
-            method: location.method || 'unknown',
-            userAgent: navigator.userAgent,
-            visitId,
-            timeSpent: 0
-          });
-          console.log('Visit logged to Firestore with ID:', docRef.id);
-        } catch (error) {
-          console.error('Error logging initial visit to Firestore:', error);
-        }
-    
-        let timeSpent = 0;
-        const updateTimeSpent = async () => {
-          timeSpent = Math.round((new Date() - startTime) / 1000);
-          try {
-            await addDoc(collection(db, 'visit_updates'), {
-              visitId,
-              timeSpent,
-              endTime: new Date().toISOString()
+          const getUserLocation = () => {
+            return new Promise((resolve) => {
+              if (navigator.geolocation) {
+                console.log('Requesting geolocation...');
+                navigator.geolocation.getCurrentPosition(
+                  (position) => {
+                    resolve({
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                      locationDenied: false,
+                      method: 'navigator'
+                    });
+                  },
+                  async (error) => {
+                    console.warn('Geolocation error:', error.message);
+                    const fallback = await getFallbackLocation();
+                    resolve(fallback);
+                  },
+                  { timeout: 5000, maximumAge: 60000, enableHighAccuracy: true }
+                );
+              } else {
+                console.warn('Geolocation not supported, using fallback');
+                resolve(getFallbackLocation());
+              }
             });
-          } catch (error) {
-            console.error('Error updating timeSpent:', error);
-          }
-        };
+          };
     
-        const intervalId = setInterval(updateTimeSpent, 10000);
-        window.addEventListener('beforeunload', () => {
-          clearInterval(intervalId);
-          updateTimeSpent();
-          logEvent(analytics, 'session_end', {
+          const notice = document.getElementById('location-notice');
+          notice.style.display = 'block';
+          let location;
+          try {
+            location = await getUserLocation();
+          } catch (error) {
+            console.error('Location fetch failed:', error);
+            location = { latitude: 'N/A', longitude: 'N/A', locationDenied: true, method: 'unknown' };
+          }
+          notice.style.display = 'none';
+    
+          logEvent(analytics, 'page_visit', {
             referrer_id: referrer,
-            time_spent: timeSpent,
+            step_id: step,
             page_location: pageLocation,
-            visit_id: visitId
+            latitude: String(location.latitude),
+            longitude: String(location.longitude),
+            location_denied: location.locationDenied,
+            visit_id: visitId,
+            timestamp: startTime.toISOString()
+          });
+    
+          try {
+            const docRef = await addDoc(collection(db, 'visits'), {
+              referrer,
+              step,
+              pageLocation,
+              startTime: startTime.toISOString(),
+              latitude: location.latitude,
+              longitude: location.longitude,
+              locationDenied: location.locationDenied,
+              method: location.method || 'unknown',
+              userAgent: navigator.userAgent,
+              visitId,
+              timeSpent: 0
+            });
+            console.log('Visit logged to Firestore with ID:', docRef.id);
+          } catch (error) {
+            console.error('Error logging initial visit to Firestore:', error);
+          }
+    
+          let timeSpent = 0;
+          const updateTimeSpent = async () => {
+            timeSpent = Math.round((new Date() - startTime) / 1000);
+            try {
+              await addDoc(collection(db, 'visit_updates'), {
+                visitId,
+                timeSpent,
+                endTime: new Date().toISOString()
+              });
+            } catch (error) {
+              console.error('Error updating timeSpent:', error);
+            }
+          };
+    
+          const intervalId = setInterval(updateTimeSpent, 10000);
+          window.addEventListener('beforeunload', () => {
+            clearInterval(intervalId);
+            updateTimeSpent();
+            logEvent(analytics, 'session_end', {
+              referrer_id: referrer,
+              time_spent: timeSpent,
+              page_location: pageLocation,
+              visit_id: visitId
+            });
           });
         });
-      });
+      } catch (error) {
+        console.error('Firebase setup failed:', error);
+      }
     </script>
 </body>
 </html>
